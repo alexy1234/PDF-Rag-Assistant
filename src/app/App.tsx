@@ -9,6 +9,25 @@ interface Document {
   filename: string;
 }
 
+interface ChatResponse {
+  answer: string;
+  sources: {
+    documentId: string;
+    filename: string;
+    content: string;
+    similarity: number;
+    chunkIndex?: number;
+  }[];
+  metadata?: {
+    totalChunks: number;
+    chunksUsed: number;
+    documentsUsed: string[];
+    searchStrategy: string;
+    contextLength: number;
+    maxContextLength: number;
+  };
+}
+
 export function App() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -87,13 +106,30 @@ export function App() {
     }
   };
 
-  const handleSendMessage = async (message: string) => {
+  const handleSendMessage = async (message: string, selectedDocumentIds?: string[]): Promise<ChatResponse> => {
+    // Use selected documents if provided, otherwise use all available documents
+    const documentIds = selectedDocumentIds && selectedDocumentIds.length > 0 
+      ? selectedDocumentIds 
+      : (documents.length > 0 ? documents.map(doc => doc.documentId) : undefined);
+    
+    const requestBody = {
+      query: message,
+      documentIds: documentIds,
+      options: {
+        includeAllChunks: true, // Enable comprehensive coverage
+        maxContextLength: 50000, // Much larger context for comprehensive coverage
+        topK: 20 // Get more relevant chunks initially
+      }
+    };
+
+    console.log('🔍 Sending chat request:', requestBody);
+
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ query: message }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -101,7 +137,14 @@ export function App() {
       throw new Error(error.error || 'Chat failed');
     }
 
-    return await response.json();
+    const result = await response.json();
+    
+    // Log metadata if available
+    if (result.metadata) {
+      console.log('📊 Response metadata:', result.metadata);
+    }
+    
+    return result;
   };
 
   return (
@@ -128,6 +171,7 @@ export function App() {
         />
         
         <ChatInterface
+          documents={documents}
           onSendMessage={handleSendMessage}
           isLoading={isProcessing}
         />

@@ -1,6 +1,9 @@
 # dependencies (bun install)
 node_modules
 
+# hnsw-storage
+vector-storage
+
 # output
 out
 dist

@@ -10,25 +10,43 @@ interface Message {
     filename: string;
     content: string;
     similarity: number;
+    chunkIndex?: number;
   }[];
 }
 
+interface Document {
+  documentId: string;
+  filename: string;
+}
+
 interface ChatInterfaceProps {
-  onSendMessage: (message: string) => Promise<{
+  documents: Document[];
+  onSendMessage: (message: string, selectedDocumentIds?: string[]) => Promise<{
     answer: string;
     sources: {
       documentId: string;
       filename: string;
       content: string;
       similarity: number;
+      chunkIndex?: number;
     }[];
+    metadata?: {
+      totalChunks: number;
+      chunksUsed: number;
+      documentsUsed: string[];
+      searchStrategy: string;
+      contextLength: number;
+      maxContextLength: number;
+    };
   }>;
   isLoading: boolean;
 }
 
-export function ChatInterface({ onSendMessage, isLoading }: ChatInterfaceProps) {
+export function ChatInterface({ documents, onSendMessage, isLoading }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const [showDetailedSources, setShowDetailedSources] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -54,7 +72,9 @@ export function ChatInterface({ onSendMessage, isLoading }: ChatInterfaceProps) 
     setInputValue('');
 
     try {
-      const response = await onSendMessage(inputValue);
+      // Use selected documents if any, otherwise use all documents
+      const documentIdsToUse = selectedDocumentIds.length > 0 ? selectedDocumentIds : undefined;
+      const response = await onSendMessage(inputValue, documentIdsToUse);
       
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
@@ -88,6 +108,39 @@ export function ChatInterface({ onSendMessage, isLoading }: ChatInterfaceProps) 
           <p className="text-sm text-gray-600">
             Ask questions about your uploaded PDF documents
           </p>
+          
+          {/* Document Selection */}
+          {documents.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Select documents to query (or leave empty to search all):
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {documents.map((doc) => (
+                  <label key={doc.documentId} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedDocumentIds.includes(doc.documentId)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedDocumentIds(prev => [...prev, doc.documentId]);
+                        } else {
+                          setSelectedDocumentIds(prev => prev.filter(id => id !== doc.documentId));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-600">{doc.filename}</span>
+                  </label>
+                ))}
+              </div>
+              {selectedDocumentIds.length > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Selected: {selectedDocumentIds.length} document(s)
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Messages */}
@@ -114,15 +167,59 @@ export function ChatInterface({ onSendMessage, isLoading }: ChatInterfaceProps) 
                   
                   {message.sources && message.sources.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-gray-200">
-                      <p className="text-xs font-semibold mb-2">Sources:</p>
-                      {message.sources.map((source, index) => (
-                        <div key={index} className="text-xs mb-1">
-                          <span className="font-medium">{source.filename}</span>
-                          <span className="text-gray-500 ml-2">
-                            ({(source.similarity * 100).toFixed(1)}% match)
-                          </span>
-                        </div>
-                      ))}
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold">Sources:</p>
+                        <button
+                          type="button"
+                          onClick={() => setShowDetailedSources(!showDetailedSources)}
+                          className="text-xs text-blue-600 hover:text-blue-800 underline"
+                        >
+                          {showDetailedSources ? 'Show Summary' : 'Show Details'}
+                        </button>
+                      </div>
+                      
+                      {showDetailedSources ? (
+                        // Show detailed sources (original behavior)
+                                                  message.sources.map((source, index) => (
+                            <div key={index} className="text-xs mb-1">
+                              <span className="font-medium">{source.filename}</span>
+                              <span className="text-gray-500 ml-2">
+                                (Chunk {source.chunkIndex || 'N/A'}, {(source.similarity * 100).toFixed(1)}% match)
+                              </span>
+                            </div>
+                          ))
+                      ) : (
+                        // Show summarized sources (new behavior)
+                        (() => {
+                          const sourceMap = new Map<string, { count: number; avgSimilarity: number; chunkIndices: number[] }>();
+                          
+                          message.sources.forEach(source => {
+                            const existing = sourceMap.get(source.filename);
+                            if (existing) {
+                              existing.count++;
+                              existing.avgSimilarity = (existing.avgSimilarity + source.similarity) / 2;
+                              if (source.chunkIndex !== undefined) {
+                                existing.chunkIndices.push(source.chunkIndex);
+                              }
+                            } else {
+                              sourceMap.set(source.filename, { 
+                                count: 1, 
+                                avgSimilarity: source.similarity,
+                                chunkIndices: source.chunkIndex !== undefined ? [source.chunkIndex] : []
+                              });
+                            }
+                          });
+                          
+                          return Array.from(sourceMap.entries()).map(([filename, stats]) => (
+                            <div key={filename} className="text-xs mb-1">
+                              <span className="font-medium">{filename}</span>
+                              <span className="text-gray-500 ml-2">
+                                ({stats.count} chunk{stats.count > 1 ? 's' : ''}, {(stats.avgSimilarity * 100).toFixed(0)}% match)
+                              </span>
+                            </div>
+                          ));
+                        })()
+                      )}
                     </div>
                   )}
                   
