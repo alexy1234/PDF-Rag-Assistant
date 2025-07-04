@@ -18,7 +18,7 @@ let pdfTester: PDFTester | null = null;
 
 try {
   const apiKey = process.env.GOOGLE_API_KEY;
-  const vectorStoreType = process.env.VECTOR_STORE_TYPE as 'memory' | 'hnsw' || 'hnsw';
+  const vectorStoreType = process.env.VECTOR_STORE_TYPE as 'memory' | 'hnsw' | 'faiss' || 'faiss';
   const storagePath = process.env.VECTOR_STORAGE_PATH || './vector-storage';
   
   console.log("🔍 Checking API key...");
@@ -39,6 +39,8 @@ try {
     console.log(`   Using ${vectorStoreType} vector store`);
     if (vectorStoreType === 'hnsw') {
       console.log(`   Persistent storage at: ${storagePath}`);
+    } else if (vectorStoreType === 'faiss') {
+      console.log(`   FAISS persistent storage at: ${storagePath}`);
     } else {
       console.log("   In-memory storage (data will be lost on restart)");
     }

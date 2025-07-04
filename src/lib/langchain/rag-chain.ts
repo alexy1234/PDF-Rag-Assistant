@@ -39,7 +39,11 @@ export class PDFRagChain {
     this.textSplitter = new TextSplitter(chunkSize, chunkOverlap);
     
     this.embeddingService = new EmbeddingService(apiKey);
-    this.vectorStore = VectorStoreFactory.create({ type: vectorStoreType, storagePath });
+    this.vectorStore = VectorStoreFactory.create({ 
+      type: vectorStoreType, 
+      storagePath,
+      embeddings: this.embeddingService.getEmbeddings() // Pass embeddings instance for FAISS
+    });
     this.llm = new ChatGoogleGenerativeAI({
       apiKey: apiKey || process.env.GOOGLE_API_KEY,
       modelName: "gemini-1.5-flash",

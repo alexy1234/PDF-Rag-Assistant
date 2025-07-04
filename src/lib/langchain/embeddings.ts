@@ -74,4 +74,9 @@ export class EmbeddingService {
       throw new Error(`Failed to generate embedding: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+
+  // Getter to expose the embeddings instance for FAISS
+  getEmbeddings(): GoogleGenerativeAIEmbeddings {
+    return this.embeddings;
+  }
 } 
