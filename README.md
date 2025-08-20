@@ -1,4 +1,4 @@
-This project is a simple RAG[https://aws.amazon.com/what-is/retrieval-augmented-generation/] (Retrieval Augmented Generation) meant to be able to process various documents, in particular those of research papers. Initially created to get acquainted with bun, langchain, LLMs / RAGs, and vibes
+This project is a simple [RAG](https://aws.amazon.com/what-is/retrieval-augmented-generation/) (Retrieval Augmented Generation) meant to be able to process various documents, in particular those of research papers. Initially created to get acquainted with bun, langchain, LLMs / RAGs, and vibes
 
 To install dependencies:
 
